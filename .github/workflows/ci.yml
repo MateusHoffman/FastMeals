@@ -1,0 +1,239 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DATABASE_URL: postgresql://fastmeals:fastmeals123@localhost:5433/fastmeals
+  JWT_SECRET: local-dev-jwt-secret-min-32-chars-change-me!!
+  JWT_REFRESH_SECRET: local-dev-refresh-secret-min-32-change!!
+  DISABLE_RATE_LIMIT: 'true'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fastmeals
+          POSTGRES_PASSWORD: fastmeals123
+          POSTGRES_DB: fastmeals
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U fastmeals -d fastmeals"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Block committed .env files
+        run: bash scripts/ci/check-no-env-committed.sh
+
+      - name: Seed mirror sync
+        run: bash scripts/ci/check-seed-sync.sh
+
+      - name: Markdown links
+        run: node scripts/ci/check-doc-links.mjs
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+          npm ci --prefix frontend
+
+      - name: Prisma migrate and seed
+        working-directory: backend
+        run: |
+          npm run migrate:deploy
+          npm run db:generate
+          npm run seed
+
+      - name: Lint, typecheck and test
+        run: npm run check
+
+      - name: Production build
+        run: npm run build
+
+  benchmark:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fastmeals
+          POSTGRES_PASSWORD: fastmeals123
+          POSTGRES_DB: fastmeals
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U fastmeals -d fastmeals"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Block committed .env files
+        run: bash scripts/ci/check-no-env-committed.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+
+      - name: Prisma migrate and seed
+        working-directory: backend
+        run: |
+          npm run migrate:deploy
+          npm run db:generate
+          npm run seed
+
+      - name: Performance gate (benchmark)
+        env:
+          BENCHMARK_RUNS: '12'
+          BENCHMARK_WRITE_SNAPSHOT: 'true'
+        run: npm run benchmark --prefix backend
+
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: |
+            docs/performance/benchmark-snapshot.json
+            docs/benchmark-latest.json
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Block committed .env files
+        run: bash scripts/ci/check-no-env-committed.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+          npm ci --prefix frontend
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Start stack (db, api, web)
+        run: docker compose up --build -d db setup api web
+
+      - name: Wait for health
+        run: bash scripts/ci/wait-for-health.sh http://127.0.0.1:3000/api/health
+
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E smoke
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: '1'
+        run: npm run e2e:smoke
+
+      - name: E2E accessibility (axe)
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: '1'
+        run: npm run e2e:a11y
+
+      - name: E2E viewer read-only
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: '1'
+        run: npm run e2e:viewer
+
+      - name: Upload Playwright trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+
+  e2e-admin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Block committed .env files
+        run: bash scripts/ci/check-no-env-committed.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+          npm ci --prefix frontend
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Start stack (db, api, web)
+        run: docker compose up --build -d db setup api web
+
+      - name: Wait for health
+        run: bash scripts/ci/wait-for-health.sh http://127.0.0.1:3000/api/health
+
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E admin full flow
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: '1'
+        run: npm run e2e:admin
+
+      - name: Upload Playwright trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-admin-traces
+          path: test-results/
