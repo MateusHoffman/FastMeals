@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: FastMeals
+    orgId: 1
+    folder: FastMeals
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
