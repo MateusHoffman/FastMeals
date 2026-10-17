@@ -43,7 +43,7 @@ jobs:
       - name: Markdown links
         run: node scripts/ci/check-doc-links.mjs
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -95,7 +95,7 @@ jobs:
       - name: Block committed .env files
         run: bash scripts/ci/check-no-env-committed.sh
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -140,7 +140,7 @@ jobs:
       - name: Block committed .env files
         run: bash scripts/ci/check-no-env-committed.sh
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -199,7 +199,7 @@ jobs:
       - name: Block committed .env files
         run: bash scripts/ci/check-no-env-committed.sh
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
