@@ -1,0 +1,35 @@
+{
+  "name": "fastmeals",
+  "private": true,
+  "description": "FastMeals — painel admin fullstack (API + React)",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "npm test --prefix backend && npm test --prefix frontend",
+    "test:backend": "npm test --prefix backend",
+    "test:frontend": "npm test --prefix frontend",
+    "typecheck": "npm run typecheck --prefix backend && npm run typecheck --prefix frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "benchmark": "npm run benchmark --prefix backend",
+    "explain": "npm run explain --prefix backend",
+    "e2e": "playwright test",
+    "e2e:smoke": "playwright test e2e/smoke.spec.ts",
+    "e2e:a11y": "playwright test e2e/a11y.spec.ts",
+    "e2e:viewer": "playwright test e2e/viewer.spec.ts",
+    "e2e:admin": "playwright test e2e/admin-flow.spec.ts --grep @admin",
+    "e2e:install": "playwright install chromium --with-deps",
+    "lint": "npm run lint --prefix backend && npm run lint --prefix frontend",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "check:env": "bash scripts/ci/check-no-env-committed.sh",
+    "check:seed-sync": "bash scripts/ci/check-seed-sync.sh",
+    "check:docs": "node scripts/ci/check-doc-links.mjs",
+    "test:summary": "node scripts/test-summary.mjs",
+    "verify": "npm run check:env && npm run check:seed-sync && npm run check:docs && npm run check && npm run build",
+    "verify:stack": "bash scripts/evaluator-verify.sh"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.55.0"
+  }
+}
