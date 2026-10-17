@@ -12,7 +12,7 @@ function seriousViolations(
 }
 
 test.describe('Acessibilidade @a11y', () => {
-  test.use({ colorScheme: 'light' });
+  test.use({ colorScheme: 'light', reducedMotion: 'reduce' });
 
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -23,6 +23,7 @@ test.describe('Acessibilidade @a11y', () => {
 
   test('tela de login', async ({ page }) => {
     await page.goto('/login');
+    await expect(page.locator('.fm-login-card .fm-btn-primary')).toBeVisible();
     const results = await new AxeBuilder({ page })
       .include('.fm-login-card')
       .analyze();
