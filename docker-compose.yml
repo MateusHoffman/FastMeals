@@ -1,0 +1,114 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fastmeals}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fastmeals123}
+      POSTGRES_DB: ${POSTGRES_DB:-fastmeals}
+    volumes:
+      - fastmeals_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: setup
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fastmeals}:${POSTGRES_PASSWORD:-fastmeals123}@db:5432/${POSTGRES_DB:-fastmeals}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-min-32-chars-change-me!!}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-dev-refresh-secret-min-32-change!!}
+      SPA_ORIGIN: ${SPA_ORIGIN:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fastmeals}:${POSTGRES_PASSWORD:-fastmeals123}@db:5432/${POSTGRES_DB:-fastmeals}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-min-32-chars-change-me!!}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-dev-refresh-secret-min-32-change!!}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      PORT: ${PORT:-3001}
+      NODE_ENV: ${NODE_ENV:-development}
+      HOST: ${DOCKER_API_HOST:-0.0.0.0}
+      TRUST_PROXY: ${DOCKER_TRUST_PROXY:-1}
+      SPA_ORIGIN: ${SPA_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DISABLE_RATE_LIMIT: ${DISABLE_RATE_LIMIT:-false}
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-3001}:3001'
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '-qO-',
+          'http://127.0.0.1:3001/api/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    ports:
+      - '127.0.0.1:${WEB_HOST_PORT:-3000}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - fastmeals_prometheus:/prometheus
+    # Sem porta no host: coleta métricas na rede Docker; UI = Grafana (:3002)
+    depends_on:
+      api:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_UID: fastmeals-api
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - fastmeals_grafana:/var/lib/grafana
+    ports:
+      - '127.0.0.1:${GRAFANA_HOST_PORT:-3002}:3000'
+    depends_on:
+      - prometheus
+
+volumes:
+  fastmeals_pg:
+  fastmeals_prometheus:
+  fastmeals_grafana:
