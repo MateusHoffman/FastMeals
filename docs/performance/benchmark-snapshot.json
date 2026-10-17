@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-16T19:46:11.721Z",
+  "node": "v24.21.0",
+  "productsListMs": {
+    "p50": 9.191772999998648,
+    "p95": 10.742245000001276
+  },
+  "ordersListMs": {
+    "p50": 11.130220999999437,
+    "p95": 14.174842999997054
+  },
+  "optimizeHttpMs": {
+    "p50": 4.254966000000422,
+    "p95": 4.52506799999901
+  },
+  "optimizePure50x30Ms": 1,
+  "algorithmCompare50x30": {
+    "hungarian": {
+      "totalDistanceKm": 226.2,
+      "executionTimeMs": 1
+    },
+    "greedyNearestNeighbor": {
+      "totalDistanceKm": 229.83,
+      "executionTimeMs": 1
+    }
+  }
+}
