@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  viewer
+
+  @@map("user_role")
+}
+
+enum ProductCategory {
+  meal
+  drink
+  dessert
+  side
+
+  @@map("product_category")
+}
+
+enum VehicleType {
+  bicycle
+  motorcycle
+  car
+
+  @@map("vehicle_type")
+}
+
+enum OrderStatus {
+  pending
+  preparing
+  ready
+  delivering
+  delivered
+  cancelled
+
+  @@map("order_status")
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password") @db.VarChar(255)
+  role         UserRole
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  orderStatusChanges OrderStatusHistory[]
+
+  @@index([email], map: "idx_users_email")
+  @@map("users")
+}
+
+model Product {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String          @db.VarChar(120)
+  description     String          @db.VarChar(500)
+  price           Decimal         @db.Decimal(10, 2)
+  category        ProductCategory
+  imageUrl        String?         @map("image_url") @db.VarChar(500)
+  isAvailable     Boolean         @default(true) @map("is_available")
+  preparationTime Int             @map("preparation_time")
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  orderItems      OrderItem[]
+
+  @@index([category], map: "idx_products_category")
+  @@index([isAvailable], map: "idx_products_is_available")
+  @@index([name], map: "idx_products_name")
+  @@index([createdAt(sort: Desc)], map: "idx_products_created_at")
+  @@index([deletedAt], map: "idx_products_deleted_at")
+  @@map("products")
+}
+
+model DeliveryPerson {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String       @db.VarChar(100)
+  phone             String       @db.VarChar(20)
+  vehicleType       VehicleType  @map("vehicle_type")
+  isActive          Boolean      @default(true) @map("is_active")
+  currentLatitude   Decimal?     @map("current_latitude") @db.Decimal(10, 8)
+  currentLongitude  Decimal?     @map("current_longitude") @db.Decimal(11, 8)
+  deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  orders            Order[]
+
+  @@index([isActive], map: "idx_delivery_persons_is_active")
+  @@index([deletedAt], map: "idx_delivery_persons_deleted_at")
+  @@map("delivery_persons")
+}
+
+model Order {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerName        String          @map("customer_name") @db.VarChar(100)
+  customerPhone       String          @map("customer_phone") @db.VarChar(20)
+  deliveryAddress     String          @map("delivery_address") @db.VarChar(300)
+  latitude            Decimal         @db.Decimal(10, 8)
+  longitude           Decimal         @db.Decimal(11, 8)
+  status              OrderStatus     @default(pending)
+  totalAmount         Decimal         @map("total_amount") @db.Decimal(10, 2)
+  deliveryPersonId    String?         @map("delivery_person_id") @db.Uuid
+  deliveredAt         DateTime?       @map("delivered_at") @db.Timestamptz(6)
+  deliveryVehicleType VehicleType?    @map("delivery_vehicle_type")
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deliveryPerson      DeliveryPerson? @relation(fields: [deliveryPersonId], references: [id])
+  items               OrderItem[]
+  statusHistory       OrderStatusHistory[]
+
+  @@index([status], map: "idx_orders_status")
+  @@index([createdAt(sort: Desc)], map: "idx_orders_created_at")
+  @@index([deliveryPersonId], map: "idx_orders_delivery_person_id")
+  @@index([status, createdAt], map: "idx_orders_status_created")
+  @@index([status, deliveredAt], map: "idx_orders_status_delivered_at")
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  quantity  Int
+  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId], map: "idx_order_items_order_id")
+  @@index([productId], map: "idx_order_items_product_id")
+  @@unique([orderId, productId], map: "uq_order_items_order_product")
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String       @map("order_id") @db.Uuid
+  fromStatus      OrderStatus? @map("from_status")
+  toStatus        OrderStatus  @map("to_status")
+  changedByUserId String?      @map("changed_by_user_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy       User?        @relation(fields: [changedByUserId], references: [id])
+
+  @@index([orderId, createdAt(sort: Desc)], map: "idx_order_status_history_order_created")
+  @@map("order_status_history")
+}
