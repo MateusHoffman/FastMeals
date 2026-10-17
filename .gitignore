@@ -1,0 +1,44 @@
+node_modules/
+**/node_modules/
+dist/
+build/
+
+# Segredos / ambiente local — NUNCA commitar (só *.env.example)
+.env
+.env.*
+!.env.example
+!**/.env.example
+backend/.env
+frontend/.env
+desafio/.env
+*.pem
+*.key
+secrets/
+credentials.json
+*.log
+.DS_Store
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+.playwright/
+
+# Artefatos locais de performance
+docs/benchmark-latest.json
+docs/explain-analyze.txt
+
+# Build frontend (nunca versionar)
+frontend/dist/
+backend/dist/
+
+# Rascunhos locais (não faz parte da entrega)
+promo/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*~
