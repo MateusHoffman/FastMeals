@@ -1,5 +1,3 @@
-# Cole em .github/workflows/security-audit.yml no repositório do seu projeto.
-
 name: Agente de auditoria de segurança
 
 on:
