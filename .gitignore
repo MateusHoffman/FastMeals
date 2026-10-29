@@ -42,3 +42,6 @@ promo/
 .vscode/
 *.swp
 *~
+
+# Relatório local do agente de auditoria de segurança
+security-audit-report.md
